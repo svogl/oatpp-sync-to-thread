@@ -8,6 +8,8 @@
 
 #include "webapi/webApp.hpp"
 
+#include "oatpp_s2t/oatpp_s2t_config.h"
+
 using namespace std;
 
 /**
@@ -24,7 +26,7 @@ int main(int argc, const char *argv[])
         } // else unknownArgs++
     }
 
-    cout << "starting up, delay set to " << ms << endl;
+    cout << " testSync " << oatpp_s2t_VERSION_FULL <<  " starting up, delay set to " << ms << endl;
 
     SyncApi api;
 

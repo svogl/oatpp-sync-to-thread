@@ -10,6 +10,7 @@
 #include "oatpp/macro/codegen.hpp"
 #include "oatpp/macro/component.hpp"
 
+#include "globals.hpp"
 #include "syncApi.hpp"
 
 #include "webapi/dto/frameDto.hpp"
@@ -41,7 +42,7 @@ class CameraController : public oatpp::web::server::api::ApiController
     ENDPOINT_INFO(GetFrameCounter)
     {
         info->summary = "get framecounter";
-        info->description = "Get the next frame counter";
+        info->description = "Get the next frame counter, sync via timer";
         info->addResponse<Int32>(Status::CODE_200, "application/json");
     }
     ENDPOINT_ASYNC("GET", "/fc", GetFrameCounter)
@@ -51,14 +52,10 @@ class CameraController : public oatpp::web::server::api::ApiController
         class SyncApiCallback : public oatpp::data::stream::ReadCallback
         {
            private:
-            // std::shared_ptr<File::Subscriber> m_subscriber;
-
-           private:
-            // OATPP_COMPONENT(std::shared_ptr<Statistics>, m_statistics);
             SyncApi& api;
             int old = -1;
             const CameraController* self;
-            int len=0;
+            int len = 0;
 
            public:
             SyncApiCallback(SyncApi& api, const CameraController* self)
@@ -80,20 +77,22 @@ class CameraController : public oatpp::web::server::api::ApiController
                 OATPP_LOGd("CAMH", "ticked {} dlen={}", api.fc, len);
                 if (len) {
                     // second iteration with new contents - tell the body-builder we are done:
-                    action = Action::createActionByType(oatpp::async::Action::TYPE_NONE);
+                    action = Action::createActionByType(
+                        oatpp::async::Action::TYPE_NONE);
                     return 0;
                 }
                 // first iteration with new contents - new data available, let's prepare an answer
 
                 FrameDto dto;
-                dto.fc = fc;
+                dto.fc = api.fc;
                 dto.exposure = api.exposure;
 
                 // todo: would like to serialize the full object in into the buffer...
                 auto mapper = self->m_contentMappers->getDefaultMapper();
 
-                String s = mapper->writeToString(dto.fc); // todo: convert dto to void?
-                
+                String s = mapper->writeToString(
+                    dto.fc);  // todo: convert dto to void?
+
                 const std::string& ss = *s;
                 len = ss.size();
 
@@ -116,17 +115,113 @@ class CameraController : public oatpp::web::server::api::ApiController
                 OutgoingResponse::createShared(Status::CODE_200, body);
             response->putHeader("content-type", "application/json");
 
-            // auto response = controller->createResponse(Status::CODE_200);
+            return _return(response);
+        }
+    };  // ENDPOINT_ASYNC("GET", "fc", GetFrameCounter
+
+    ENDPOINT_INFO(GetFrameCounterCV)
+    {
+        info->summary = "get framecounter2";
+        info->description =
+            "Get the next frame counter, sync via condition variable";
+        info->addResponse<Int32>(Status::CODE_200, "application/json");
+    }
+    ENDPOINT_ASYNC("GET", "/sync", GetFrameCounterCV)
+    {
+        ENDPOINT_ASYNC_INIT(GetFrameCounterCV)
+
+        class SyncApiCallback : public oatpp::data::stream::ReadCallback
+        {
+           private:
+            SyncApi& api;
+            int old = -1;
+            const CameraController* self;
+            int len = 0;
+
+           public:
+            SyncApiCallback(SyncApi& api, const CameraController* self)
+                : api(api), old(api.fc), self(self)
+            {
+            }
+            oatpp::v_io_size read(void* buffer, v_buff_size count,
+                                  oatpp::async::Action& action) override
+            {
+                // timer strategy adapted from oatpp/test/oatpp/web/app/ControllerAsync.hpp
+                // check if the frame counter has changed
+                if (api.fc == old) {
+                    // limits to 50fps; better would be to compute expected arrival time by storing framerate&lastTs
+                    action = oatpp::async::Action::createWaitRepeatAction(
+                        20 * 1000 + oatpp::Environment::getMicroTickCount());
+                    OATPP_LOGd("CAMH", "tick");
+                    return 0;
+                }
+                OATPP_LOGd("CAMH", "ticked {} dlen={}", api.fc, len);
+                if (len) {
+                    // second iteration with new contents - tell the body-builder we are done:
+                    action = Action::createActionByType(
+                        oatpp::async::Action::TYPE_NONE);
+                    return 0;
+                }
+                // first iteration with new contents - new data available, let's prepare an answer
+
+                FrameDto dto;
+                dto.fc = api.fc;
+                dto.exposure = api.exposure;
+
+                // todo: would like to serialize the full object in into the buffer...
+                auto mapper = self->m_contentMappers->getDefaultMapper();
+
+                String s = mapper->writeToString(
+                    dto.fc);  // todo: convert dto to void?
+
+                const std::string& ss = *s;
+                len = ss.size();
+
+                memcpy(buffer, ss.c_str(), len + 1);
+                return len;
+            }
+        };
+
+        Action act() override
+        {
+            if (!api) {
+                return _return(controller->createResponse(Status::CODE_404));
+            }
+
+            auto body = std::make_shared<
+                oatpp::web::protocol::http::outgoing::StreamingBody>(
+                std::make_shared<SyncApiCallback>(*api, controller));
+
+            auto response =
+                OutgoingResponse::createShared(Status::CODE_200, body);
+            response->putHeader("content-type", "application/json");
 
             return _return(response);
         }
     };  // ENDPOINT_ASYNC("GET", "fc", GetFrameCounter
 
-    ENDPOINT("GET", "stop", stop)
+    ENDPOINT_ASYNC("GET", "version", GetVersion)
     {
-        api->keepRunning = false;
-        return createResponse(Status::CODE_200, "leaving");
-    }
+        ENDPOINT_ASYNC_INIT(GetVersion);
+
+        Action act() override
+        {
+            return _return(
+                controller->createResponse(Status::CODE_200, version()));
+        }
+    };
+
+    ENDPOINT_ASYNC("GET", "stop", Stop)
+    {
+        ENDPOINT_ASYNC_INIT(Stop);
+
+        Action act() override
+        {
+            api->keepRunning = false;
+            return _return(
+                controller->createResponse(Status::CODE_200, "leaving"));
+        }
+    };
 };
 
 #include OATPP_CODEGEN_END(ApiController)  /// <-- End Code-Gen

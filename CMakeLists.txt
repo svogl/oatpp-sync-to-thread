@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.20)
 
 
-project (oatpp-s2t)
+project (oatpp_s2t)
 
 set (oatpp_s2t_oatpp_VERSION_MAJOR 0)
 set (oatpp_s2t_VERSION_MINOR 1)
@@ -29,7 +29,7 @@ include(CMakePackageConfigHelpers)
 
 # Build dir for generated config, export and package files
 set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
-include_directories("${CMAKE_CURRENT_BINARY_DIR}/generated")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/generated/include")
 
 
 ################################################################################
