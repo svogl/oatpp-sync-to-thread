@@ -28,7 +28,6 @@ static void run()
     OATPP_COMPONENT(std::shared_ptr<oatpp::web::server::HttpRouter>, router);
 
     oatpp::web::server::api::Endpoints docEndpoints;
-    oatpp::web::server::api::Endpoints asyncDocEndpoints;
 
     /***
      * REGISTER CONTROLLERS
@@ -40,7 +39,8 @@ static void run()
     docEndpoints.append(cameraCtrl->getEndpoints());
 
     router->addController(
-        oatpp::swagger::Controller::createShared(docEndpoints));
+        // oatpp::swagger::Controller::createShared(docEndpoints));
+        oatpp::swagger::AsyncController::createShared(docEndpoints));
 
     // static contents:
     // router->addController(std::make_shared<StaticContentsController>());

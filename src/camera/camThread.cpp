@@ -2,8 +2,9 @@
 #include <thread>
 #include <stdlib.h>
 
-#include "camThread.hpp"
-#include "oatpp/base/Log.hpp"
+#include <oatpp/base/Log.hpp>
+
+#include "camera/camThread.hpp"
 
 using namespace std;
 
@@ -26,7 +27,7 @@ static void run(SyncApi* api)
                 rnd += rand() % 0xff;
             }
             api->exposure = 512 + rnd / 6;
-            OATPP_LOGi("CAM", "beep\t{}\t{}", api->fc, api->exposure);
+            OATPP_LOGd("CAM", "beep\t{}\t{}", api->fc, api->exposure);
         }
         api->cv.notifyAll();
 

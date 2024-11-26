@@ -6,9 +6,9 @@
 #include OATPP_CODEGEN_BEGIN(DTO)
 
 /// camera settings - minimal example
-class CameraSettings : public oatpp::DTO
+class FrameDto : public oatpp::DTO
 {
-    DTO_INIT(CameraSettings, DTO)
+    DTO_INIT(FrameDto, DTO)
 
     /// frame counter, monotonic increasing
     DTO_FIELD(Int32, fc);

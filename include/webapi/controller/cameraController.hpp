@@ -12,6 +12,8 @@
 
 #include "syncApi.hpp"
 
+#include "webapi/dto/frameDto.hpp"
+
 // based on https://github.com/lganzzzo/canchat/blob/master/server/src/controller/FileController.hpp
 
 #include OATPP_CODEGEN_BEGIN(ApiController)  /// <-- Begin Code-Gen
@@ -56,35 +58,47 @@ class CameraController : public oatpp::web::server::api::ApiController
             SyncApi& api;
             int old = -1;
             const CameraController* self;
+            int len=0;
 
            public:
             SyncApiCallback(SyncApi& api, const CameraController* self)
                 : api(api), old(api.fc), self(self)
             {
             }
-
             oatpp::v_io_size read(void* buffer, v_buff_size count,
                                   oatpp::async::Action& action) override
             {
-                // strategy adapted from oatpp/test/oatpp/web/app/ControllerAsync.hpp
+                // timer strategy adapted from oatpp/test/oatpp/web/app/ControllerAsync.hpp
+                // check if the frame counter has changed
                 if (api.fc == old) {
-                    // limits to 50fps; better would be to compute expected arrival time
+                    // limits to 50fps; better would be to compute expected arrival time by storing framerate&lastTs
                     action = oatpp::async::Action::createWaitRepeatAction(
                         20 * 1000 + oatpp::Environment::getMicroTickCount());
-                    std::cout << "tick" << std::endl;
+                    OATPP_LOGd("CAMH", "tick");
                     return 0;
                 }
+                OATPP_LOGd("CAMH", "ticked {} dlen={}", api.fc, len);
+                if (len) {
+                    // second iteration with new contents - tell the body-builder we are done:
+                    action = Action::createActionByType(oatpp::async::Action::TYPE_NONE);
+                    return 0;
+                }
+                // first iteration with new contents - new data available, let's prepare an answer
 
-                oatpp::Int32 fc = api.fc;
+                FrameDto dto;
+                dto.fc = fc;
+                dto.exposure = api.exposure;
 
-                // String s = controller->writeToString(fc);
-                String s = "123";
+                // todo: would like to serialize the full object in into the buffer...
+                auto mapper = self->m_contentMappers->getDefaultMapper();
+
+                String s = mapper->writeToString(dto.fc); // todo: convert dto to void?
+                
                 const std::string& ss = *s;
+                len = ss.size();
 
-                // assert count > ss.size();
-                // get data & send
-                memcpy(buffer, ss.c_str(), ss.size());
-                return ss.size();
+                memcpy(buffer, ss.c_str(), len + 1);
+                return len;
             }
         };
 

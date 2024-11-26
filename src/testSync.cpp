@@ -3,7 +3,8 @@
 #include <thread>
 
 #include "syncApi.hpp"
-#include "camThread.hpp"
+
+#include "camera/camThread.hpp"
 
 #include "webapi/webApp.hpp"
 
