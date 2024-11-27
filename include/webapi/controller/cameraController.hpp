@@ -26,6 +26,8 @@ class CameraController : public oatpp::web::server::api::ApiController
 
     static SyncApi* api;
 
+    std::shared_ptr<oatpp::data::mapping::ObjectMapper> om;
+
    private:
     // OATPP_COMPONENT(std::shared_ptr<Lobby>, lobby);
 
@@ -34,6 +36,9 @@ class CameraController : public oatpp::web::server::api::ApiController
         std::shared_ptr<oatpp::web::mime::ContentMappers>, apiContentMappers))
         : oatpp::web::server::api::ApiController(apiContentMappers)
     {
+        om = apiContentMappers->getDefaultMapper();
+        OATPP_LOGd("CAMH", "CameraController: mapper serializing to {}/{}", om->getInfo().mimeType,
+                   om->getInfo().mimeSubtype);
     }
 
     void setApi(SyncApi* api) { this->api = api; }
@@ -83,15 +88,11 @@ class CameraController : public oatpp::web::server::api::ApiController
                 }
                 // first iteration with new contents - new data available, let's prepare an answer
 
-                FrameDto dto;
-                dto.fc = api.fc;
-                dto.exposure = api.exposure;
+                auto dto = FrameDto::createShared();
+                dto->fc = api.fc;
+                dto->exposure = api.exposure;
 
-                // todo: would like to serialize the full object in into the buffer...
-                auto mapper = self->m_contentMappers->getDefaultMapper();
-
-                String s = mapper->writeToString(
-                    dto.fc);  // todo: convert dto to void?
+                String s = self->om->writeToString(dto);
 
                 const std::string& ss = *s;
                 len = ss.size();
