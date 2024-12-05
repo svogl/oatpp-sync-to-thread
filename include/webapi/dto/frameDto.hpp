@@ -10,6 +10,10 @@ class FrameDto : public oatpp::DTO
 {
     DTO_INIT(FrameDto, DTO)
 
+    virtual ~FrameDto() {
+        std::cout << "~FrameDto " << this << std::endl;
+    }
+
     /// frame counter, monotonic increasing
     DTO_FIELD(Int32, fc);
 

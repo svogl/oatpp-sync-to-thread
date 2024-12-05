@@ -15,6 +15,12 @@
 
 #include "webapi/dto/frameDto.hpp"
 
+
+/** sync camera thread and web frontend via async timeouts. 
+ * Ugly, but works.
+ * The cmaeraControllerTimer is similar, but has the callback class extracted from the controller.
+ */
+
 // based on https://github.com/lganzzzo/canchat/blob/master/server/src/controller/FileController.hpp
 
 #include OATPP_CODEGEN_BEGIN(ApiController)  /// <-- Begin Code-Gen
@@ -37,8 +43,8 @@ class CameraController : public oatpp::web::server::api::ApiController
         : oatpp::web::server::api::ApiController(apiContentMappers)
     {
         om = apiContentMappers->getDefaultMapper();
-        OATPP_LOGd("CAMH", "CameraController: mapper serializing to {}/{}", om->getInfo().mimeType,
-                   om->getInfo().mimeSubtype);
+        OATPP_LOGd("CAMH", "CameraController: mapper serializing to {}/{}",
+                   om->getInfo().mimeType, om->getInfo().mimeSubtype);
     }
 
     void setApi(SyncApi* api) { this->api = api; }
@@ -93,87 +99,6 @@ class CameraController : public oatpp::web::server::api::ApiController
                 dto->exposure = api.exposure;
 
                 String s = self->om->writeToString(dto);
-
-                const std::string& ss = *s;
-                len = ss.size();
-
-                memcpy(buffer, ss.c_str(), len + 1);
-                return len;
-            }
-        };
-
-        Action act() override
-        {
-            if (!api) {
-                return _return(controller->createResponse(Status::CODE_404));
-            }
-
-            auto body = std::make_shared<
-                oatpp::web::protocol::http::outgoing::StreamingBody>(
-                std::make_shared<SyncApiCallback>(*api, controller));
-
-            auto response =
-                OutgoingResponse::createShared(Status::CODE_200, body);
-            response->putHeader("content-type", "application/json");
-
-            return _return(response);
-        }
-    };  // ENDPOINT_ASYNC("GET", "fc", GetFrameCounter
-
-    ENDPOINT_INFO(GetFrameCounterCV)
-    {
-        info->summary = "get framecounter2";
-        info->description =
-            "Get the next frame counter, sync via condition variable";
-        info->addResponse<Int32>(Status::CODE_200, "application/json");
-    }
-    ENDPOINT_ASYNC("GET", "/sync", GetFrameCounterCV)
-    {
-        ENDPOINT_ASYNC_INIT(GetFrameCounterCV)
-
-        class SyncApiCallback : public oatpp::data::stream::ReadCallback
-        {
-           private:
-            SyncApi& api;
-            int old = -1;
-            const CameraController* self;
-            int len = 0;
-
-           public:
-            SyncApiCallback(SyncApi& api, const CameraController* self)
-                : api(api), old(api.fc), self(self)
-            {
-            }
-            oatpp::v_io_size read(void* buffer, v_buff_size count,
-                                  oatpp::async::Action& action) override
-            {
-                // timer strategy adapted from oatpp/test/oatpp/web/app/ControllerAsync.hpp
-                // check if the frame counter has changed
-                if (api.fc == old) {
-                    // limits to 50fps; better would be to compute expected arrival time by storing framerate&lastTs
-                    action = oatpp::async::Action::createWaitRepeatAction(
-                        20 * 1000 + oatpp::Environment::getMicroTickCount());
-                    OATPP_LOGd("CAMH", "tick");
-                    return 0;
-                }
-                OATPP_LOGd("CAMH", "ticked {} dlen={}", api.fc, len);
-                if (len) {
-                    // second iteration with new contents - tell the body-builder we are done:
-                    action = Action::createActionByType(
-                        oatpp::async::Action::TYPE_NONE);
-                    return 0;
-                }
-                // first iteration with new contents - new data available, let's prepare an answer
-
-                FrameDto dto;
-                dto.fc = api.fc;
-                dto.exposure = api.exposure;
-
-                // todo: would like to serialize the full object in into the buffer...
-                auto mapper = self->m_contentMappers->getDefaultMapper();
-
-                String s = mapper->writeToString(
-                    dto.fc);  // todo: convert dto to void?
 
                 const std::string& ss = *s;
                 len = ss.size();

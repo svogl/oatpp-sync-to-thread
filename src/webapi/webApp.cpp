@@ -9,6 +9,9 @@
 
 #include "webapi/appComponent.hpp"
 #include "webapi/controller/cameraController.hpp"
+#include "webapi/controller/cameraControllerSyncSimple.hpp"
+#include "webapi/controller/cameraControllerCV.hpp"
+#include "webapi/controller/cameraControllerTimer.hpp"
 #include "webapi/swaggerComponent.hpp"
 
 #include "syncApi.hpp"
@@ -17,7 +20,6 @@ static oatpp::network::Server* theServer = nullptr;
 static std::thread* runner = nullptr;
 
 static SyncApi* api = nullptr;
-
 
 static void run()
 {
@@ -33,11 +35,30 @@ static void run()
      * REGISTER CONTROLLERS
      */
 
-    auto cameraCtrl = std::make_shared<CameraController>();
-    cameraCtrl->setApi(api);
-    router->addController(cameraCtrl);
-    docEndpoints.append(cameraCtrl->getEndpoints());
-
+    {
+        auto cameraCtrl = std::make_shared<CameraController>();
+        cameraCtrl->setApi(api);
+        router->addController(cameraCtrl);
+        docEndpoints.append(cameraCtrl->getEndpoints());
+    }
+    {
+        auto cameraCtrl = std::make_shared<CameraControllerCV>();
+        cameraCtrl->setApi(api);
+        router->addController(cameraCtrl);
+        docEndpoints.append(cameraCtrl->getEndpoints());
+    }
+    {
+        auto cameraCtrl = std::make_shared<CameraControllerSyncSimple>();
+        cameraCtrl->setApi(api);
+        router->addController(cameraCtrl);
+        docEndpoints.append(cameraCtrl->getEndpoints());
+    }
+    {
+        auto cameraCtrl = std::make_shared<CameraControllerTimer>();
+        cameraCtrl->setApi(api);
+        router->addController(cameraCtrl);
+        docEndpoints.append(cameraCtrl->getEndpoints());
+    }
     router->addController(
         // oatpp::swagger::Controller::createShared(docEndpoints));
         oatpp::swagger::AsyncController::createShared(docEndpoints));
@@ -48,7 +69,7 @@ static void run()
     /***
      * /REGISTER CONTROLLERS
      */
-    
+
     /* Get connection handler component */
     OATPP_COMPONENT(std::shared_ptr<oatpp::network::ConnectionHandler>,
                     connectionHandler);
